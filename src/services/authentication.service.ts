@@ -5,6 +5,33 @@ import { notFound } from "../error/NotFoundError";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key"; // Clé secrète pour signer le token
 
+type Role = 'admin' | 'gerant' | 'utilisateur';
+
+const getRightsByRole = (role: Role): string[] => {
+  const rights: Record<Role, string[]> = {
+    admin: [
+      'book:read', 'book:write', 'book:update', 'book:delete',
+      'bookCollection:read', 'bookCollection:write', 'bookCollection:update', 'bookCollection:delete',
+      'author:read', 'author:write', 'author:update', 'author:delete',
+      'user:read', 'user:write', 'user:update', 'user:delete'
+    ],
+    gerant: [
+      'book:read', 'book:write', 'book:update',
+      'bookCollection:read', 'bookCollection:write', 'book:update', 'bookCollection:delete',
+      'author:read', 'author:write', 'book:update',
+      'user:read', 'user:write', 'user:update',
+    ],
+    utilisateur: [
+      'book:read', 'book:write',
+      'bookCollection:read',
+      'author:read',
+      'user:read'
+    ],
+  };
+
+  return rights[role] || [];
+};
+
 export class AuthenticationService {
   public async authenticate(
     username: string,
@@ -18,14 +45,15 @@ export class AuthenticationService {
     }
 
     // Décoder le mot de passe stocké en base de données
-    const decodedPassword = Buffer.from(user.password, "base64").toString(
-      "utf-8"
-    );
+    const decodedPassword = Buffer.from(user.password, "base64").toString("utf-8");
 
     // Vérifie si le mot de passe est correct
     if (password === decodedPassword) {
-      // Si l'utilisateur est authentifié, on génère un JWT
-      const token = jwt.sign({ username: user.username }, JWT_SECRET, {
+      // Récupérer les droits basés sur le rôle de l'utilisateur
+      const rights = getRightsByRole(user.username as Role);
+
+      // Générer le token JWT avec les droits
+      const token = jwt.sign({ username: user.username, scopes: rights }, JWT_SECRET, {
         expiresIn: "1h",
       });
       return token;
